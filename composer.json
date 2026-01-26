@@ -24,7 +24,6 @@
   "minimum-stability": "dev",
   "require": {
     "php": "^8.2",
-    "symfony/var-dumper": "^7.1",
     "tecnickcom/tcpdf": "^6.7",
     "nfephp-org/sped-common": "^5.1",
     "ext-dom": "*",
@@ -37,5 +36,8 @@
   "config": {
     "optimize-autoloader": true
   },
-  "prefer-stable": true
+  "prefer-stable": true,
+  "require-dev": {
+    "symfony/var-dumper": "^6.4 || ^7.0"
+  }
 }
