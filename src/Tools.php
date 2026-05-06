@@ -12,7 +12,7 @@ class Tools extends RestCurl
         parent::__construct($config, $cert);
     }
 
-    public function consultarNfseChave($chave)
+    public function consultarNfseChave($chave, $encoding = true)
     {
         $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_nfse'));
         $retorno = $this->getData($operacao);
@@ -23,7 +23,7 @@ class Tools extends RestCurl
         if ($retorno) {
             $base_decode = base64_decode($retorno['nfseXmlGZipB64']);
             $gz_decode = gzdecode($base_decode);
-            return mb_convert_encoding($gz_decode, 'UTF-8', 'ISO-8859-1');
+            return $encoding ? mb_convert_encoding($gz_decode, 'ISO-8859-1') : $gz_decode;
         }
         return null;
     }

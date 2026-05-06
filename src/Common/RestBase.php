@@ -20,7 +20,7 @@ class RestBase
     protected $certfile;
     public $waitingTime = 45;
 
-    public function __construct(Certificate $certificate = null)
+    public function __construct(?Certificate $certificate = null)
     {
         $this->loadCertificate($certificate);
     }
@@ -30,7 +30,7 @@ class RestBase
      * @param Certificate $certificate
      * @return void
      */
-    public function loadCertificate(Certificate $certificate = null)
+    public function loadCertificate(?Certificate $certificate = null)
     {
         $this->isCertificateExpired($certificate);
         if (null !== $certificate) {
@@ -44,7 +44,7 @@ class RestBase
      * @return void
      * @throws Certificate\Exception\Expired
      */
-    private function isCertificateExpired(Certificate $certificate = null)
+    private function isCertificateExpired(?Certificate $certificate = null)
     {
         if (!$this->disableCertValidation) {
             if (null !== $certificate && $certificate->isExpired()) {

@@ -29,8 +29,8 @@ class RestCurl extends RestBase
         "emitir_nfse" => "nfse",
         "cancelar_nfse" => "nfse/{chave}/eventos"
     ];
-    private $URLS = [];
-    private $OPERATIONS = [];
+    private $urls = [];
+    private $operations = [];
     private mixed $config;
     private string $url_api;
     private $connection_timeout = 30;
@@ -66,9 +66,9 @@ class RestCurl extends RestBase
 
         $contextData = $json[$context] ?? [];
 
-        $this->URLS = $this->mergeDefaults(self::DEFAULT_URLS, $contextData['urls'] ?? []);
+        $this->urls = $this->mergeDefaults(self::DEFAULT_URLS, $contextData['urls'] ?? []);
 
-        $this->OPERATIONS = $this->mergeDefaults(self::DEFAULT_OPERATIONS, $contextData['operations'] ?? []);
+        $this->operations = $this->mergeDefaults(self::DEFAULT_OPERATIONS, $contextData['operations'] ?? []);
 
     }
 
@@ -84,7 +84,7 @@ class RestCurl extends RestBase
 
     public function getOperation($operation)
     {
-        return $this->OPERATIONS[$operation];
+        return $this->operations[$operation];
     }
 
     /**
@@ -229,7 +229,6 @@ class RestCurl extends RestBase
             }
             $headsize = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
             $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
-            curl_close($oCurl);
             $this->responseHead = trim(substr($response, 0, $headsize));
             $this->responseBody = trim(substr($response, $headsize));
             return json_decode($this->responseBody, true);
@@ -276,21 +275,21 @@ class RestCurl extends RestBase
     {
         switch ($origem) {
             case 1: // SEFIN
-                $this->url_api = $this->URLS['sefin_homologacao'];
+                $this->url_api = $this->urls['sefin_homologacao'];
                 if ($this->config->tpamb === 1) {
-                    $this->url_api = $this->URLS['sefin_producao'];
+                    $this->url_api = $this->urls['sefin_producao'];
                 }
                 break;
             case 2: // ADN
-                $this->url_api = $this->URLS['adn_homologacao'];
+                $this->url_api = $this->urls['adn_homologacao'];
                 if ($this->config->tpamb === 1) {
-                    $this->url_api = $this->URLS['adn_producao'];
+                    $this->url_api = $this->urls['adn_producao'];
                 }
                 break;
             case 3: // NFSE
-                $this->url_api = $this->URLS['nfse_homologacao'];
+                $this->url_api = $this->urls['nfse_homologacao'];
                 if ($this->config->tpamb === 1) {
-                    $this->url_api = $this->URLS['nfse_producao'];
+                    $this->url_api = $this->urls['nfse_producao'];
                 }
                 break;
         }
