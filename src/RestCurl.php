@@ -41,7 +41,6 @@ class RestCurl extends RestBase
     public array $soapinfo;
     public string $responseHead;
     public string $responseBody;
-    private string $requestHead;
     private string $cookies = '';
 
     protected $canonical = [true, false, null, null];
@@ -69,7 +68,6 @@ class RestCurl extends RestBase
         $this->urls = $this->mergeDefaults(self::DEFAULT_URLS, $contextData['urls'] ?? []);
 
         $this->operations = $this->mergeDefaults(self::DEFAULT_OPERATIONS, $contextData['operations'] ?? []);
-
     }
 
     private function mergeDefaults(array $defaults, array $overrides): array
@@ -119,14 +117,6 @@ class RestCurl extends RestBase
             if (!empty($this->security_level)) {
                 curl_setopt($oCurl, CURLOPT_SSL_CIPHER_LIST, "{$this->security_level}");
             }
-            //            if (!$this->disablesec) {
-            //                curl_setopt($oCurl, CURLOPT_SSL_VERIFYHOST, 2);
-            //                if (!empty($this->casefaz)) {
-            //                    if (is_file($this->casefaz)) {
-            //                        curl_setopt($oCurl, CURLOPT_CAINFO, $this->casefaz);
-            //                    }
-            //                }
-            //            }
             curl_setopt($oCurl, CURLOPT_SSLVERSION, CURL_SSLVERSION_DEFAULT);
             curl_setopt($oCurl, CURLOPT_SSLCERT, $this->tempdir . $this->certfile);
             curl_setopt($oCurl, CURLOPT_SSLKEY, $this->tempdir . $this->prifile);
@@ -143,7 +133,6 @@ class RestCurl extends RestBase
                 curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
             }
             $response = curl_exec($oCurl);
-
             $this->soaperror = curl_error($oCurl);
             $this->soaperror_code = curl_errno($oCurl);
             $ainfo = curl_getinfo($oCurl);
@@ -155,7 +144,6 @@ class RestCurl extends RestBase
             $contentType = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
             $this->responseHead = trim(substr($response, 0, $headsize));
             $this->responseBody = trim(substr($response, $headsize));
-            //detecta redirect, conseguiu logar com certificado na origem 3 e pega cookies
             if ($origem == 3 and $httpcode == 302) {
                 $this->captureCookies($this->responseHead, $origem);
                 return ['sucesso' => true];
@@ -183,12 +171,9 @@ class RestCurl extends RestBase
         try {
             $msgSize = $data ? strlen($data) : 0;
             $parameters = [
-                //                'Accept: */*; ',
                 'Content-Type: application/json',
-                //                "Content-Type: application/x-www-form-urlencoded;charset=utf-8;",
                 'Content-length: ' . $msgSize,
             ];
-            //            $this->requestHead = implode("\n", $parameters);
             $oCurl = curl_init();
             $api_url = $this->url_api;
             if (strlen($operacao) > 0) {
@@ -251,7 +236,8 @@ class RestCurl extends RestBase
      * Sign XML passing in content
      * @param string $content
      * @param string $tagname
-     * @param string $mark
+     * @param string|null $mark
+     * @param $rootname
      * @return string XML signed
      */
     public function sign(string $content, string $tagname, ?string $mark, $rootname)

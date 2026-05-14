@@ -120,16 +120,6 @@ class RestBase
         $ret = true;
         //load private key pem
         $private = $this->certificate->privateKey;
-//        if ($this->encriptPrivateKey) {
-//            //replace private key pem with password
-//            $this->temppass = Strings::randomString(16);
-//            //encripta a chave privada entes da gravação do filesystem
-//            openssl_pkey_export(
-//                $this->certificate->privateKey,
-//                $private,
-//                $this->temppass
-//            );
-//        }
         $ret &= $this->filesystem->put(
             $this->prifile,
             $private

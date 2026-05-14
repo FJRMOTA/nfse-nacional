@@ -62,9 +62,6 @@ class Dps implements DpsInterface
             if (empty($this->std->version)) {
                 $this->std->version = '1.01';
             }
-            //$ver = str_replace('.', '_', $this->std->version);
-            //$this->jsonschema = realpath("../storage/jsonSchemes/v$ver/rps.schema");
-            //$this->validInputData();
         }
     }
 
@@ -275,8 +272,6 @@ class Dps implements DpsInterface
                         true
                     );
                 }
-
-                //                dd($this->std->infdps->prest->end);
                 $this->dom->addChild(
                     $end_inner,
                     'xLgr',
@@ -339,7 +334,6 @@ class Dps implements DpsInterface
                 $this->std->infdps->prest->regtrib->regesptrib,
                 true
             );
-
         }
         if (isset($this->std->infdps->toma)) {
             $toma_inner = $this->dom->createElement('toma');
@@ -486,12 +480,6 @@ class Dps implements DpsInterface
                 );
             }
         }
-
-        //TODO Fazer grupo interm
-        //if (isset($this->std->interm)) {
-        //    $interm_inner = $this->dom->createElement('interm');
-        //    $infdps_inner->appendChild($interm_inner);
-        //}
 
         $serv_inner = $this->dom->createElement('serv');
         $infdps_inner->appendChild($serv_inner);
@@ -1361,7 +1349,6 @@ class Dps implements DpsInterface
         $dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
         $this->dps->appendChild($infdps_inner);
         $this->dom->appendChild($this->dps);
-        /*        return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $this->dom->saveXML());*/
         return $this->dom->saveXML();
     }
 
@@ -1483,29 +1470,6 @@ class Dps implements DpsInterface
         }
         return $clone;
     }
-
-    //    /**
-    //     * Validation json data from json Schema
-    //     * @param stdClass $data
-    //     * @return boolean
-    //     * @throws \RuntimeException
-    //     */
-    //    protected function validInputData()
-    //    {
-    //        if (!is_file($this->jsonschema)) {
-    //            return true;
-    //        }
-    //        $validator = new JsonValid();
-    //        $validator->check($this->std, (object)['$ref' => 'file://' . $this->jsonschema]);
-    //        if (!$validator->isValid()) {
-    //            $msg = "";
-    //            foreach ($validator->getErrors() as $error) {
-    //                $msg .= sprintf("[%s] %s\n", $error['property'], $error['message']);
-    //            }
-    //            throw new InvalidArgumentException($msg);
-    //        }
-    //        return true;
-    //    }
 
     public function getDpsId()
     {
