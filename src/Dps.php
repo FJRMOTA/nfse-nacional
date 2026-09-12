@@ -167,12 +167,14 @@ class Dps implements DpsInterface
                 $this->std->infdps->subst->cmotivo,
                 true
             );
-            $this->dom->addChild(
-                $subst_inner,
-                'xMotivo',
-                $this->std->infdps->subst->xmotivo,
-                true
-            );
+            if (isset($this->std->infdps->subst->xmotivo)) {
+                $this->dom->addChild(
+                    $subst_inner,
+                    'xMotivo',
+                    $this->std->infdps->subst->xmotivo,
+                    true
+                );
+            }
         }
 
         if (isset($this->std->infdps->prest)) {
@@ -512,10 +514,15 @@ class Dps implements DpsInterface
         $cserv_inner = $this->dom->createElement('cServ');
         $serv_inner->appendChild($cserv_inner);
 
+        $cTribNac = $this->std->infdps->serv->cserv->ctribnac ?? null;
+        if (!is_string($cTribNac) || !preg_match('/^[0-9]{6}$/', $cTribNac)) {
+            throw new \InvalidArgumentException('cTribNac deve conter exatamente seis dígitos.');
+        }
+
         $this->dom->addChild(
             $cserv_inner,
             'cTribNac',
-            $this->std->infdps->serv->cserv->ctribnac,
+            $cTribNac,
             true
         );
         if (isset($this->std->infdps->serv->cserv->ctribmun)) {
@@ -1394,6 +1401,24 @@ class Dps implements DpsInterface
         }
 
         $this->init($std);
+        $inf = $this->std->infpedreg ?? null;
+        if (!$inf instanceof stdClass) {
+            throw new \InvalidArgumentException('infPedReg é obrigatório para registrar evento.');
+        }
+        foreach (['tpamb', 'veraplic', 'dhevento', 'chnfse'] as $field) {
+            if (!isset($inf->{$field}) || trim((string) $inf->{$field}) === '') {
+                throw new \InvalidArgumentException("infPedReg.{$field} é obrigatório.");
+            }
+        }
+        if ((isset($inf->cnpjautor) ? 1 : 0) + (isset($inf->cpfautor) ? 1 : 0) !== 1) {
+            throw new \InvalidArgumentException('Informe exatamente CNPJAutor ou CPFAutor.');
+        }
+        if (!preg_match('/^[0-9]{50}$/', (string) $inf->chnfse)) {
+            throw new \InvalidArgumentException('chNFSe deve conter exatamente 50 dígitos.');
+        }
+        if (!isset($inf->e101101) && !isset($inf->e105102)) {
+            throw new \InvalidArgumentException('Evento não suportado ou não informado.');
+        }
         $this->evento = $this->dom->createElement('pedRegEvento');
         $this->evento->setAttribute('versao', $this->std->version);
         $this->evento->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
@@ -1404,66 +1429,96 @@ class Dps implements DpsInterface
         $this->dom->addChild(
             $infpedreg_inner,
             'tpAmb',
-            $this->std->infpedreg->tpamb,
+            $inf->tpamb,
             true
         );
         $this->dom->addChild(
             $infpedreg_inner,
             'verAplic',
-            $this->std->infpedreg->veraplic,
+            $inf->veraplic,
             true
         );
         $this->dom->addChild(
             $infpedreg_inner,
             'dhEvento',
-            $this->std->infpedreg->dhevento,
+            $inf->dhevento,
             true
         );
-        if (isset($this->std->infpedreg->cnpjautor)) {
+        if (isset($inf->cnpjautor)) {
             $this->dom->addChild(
                 $infpedreg_inner,
                 'CNPJAutor',
-                $this->std->infpedreg->cnpjautor,
+                $inf->cnpjautor,
                 true
             );
         }
-        if (isset($this->std->infpedreg->cpfautor)) {
+        if (isset($inf->cpfautor)) {
             $this->dom->addChild(
                 $infpedreg_inner,
                 'CPFAutor',
-                $this->std->infpedreg->cpfautor,
+                $inf->cpfautor,
                 true
             );
         }
         $this->dom->addChild(
             $infpedreg_inner,
             'chNFSe',
-            $this->std->infpedreg->chnfse,
+            $inf->chnfse,
             true
         );
 
 
-        if (isset($this->std->infpedreg->e101101)) {
+        if (isset($inf->e101101)) {
+            $event = $inf->e101101;
+            foreach (['xdesc', 'cmotivo', 'xmotivo'] as $field) {
+                if (!isset($event->{$field}) || trim((string) $event->{$field}) === '') {
+                    throw new \InvalidArgumentException("e101101.{$field} é obrigatório.");
+                }
+            }
+            if ((string) $event->xdesc !== 'Cancelamento de NFS-e') {
+                throw new \InvalidArgumentException('e101101.xDesc possui valor inválido.');
+            }
             $e101101_inner = $this->dom->createElement('e101101');
             $infpedreg_inner->appendChild($e101101_inner);
             $this->dom->addChild(
                 $e101101_inner,
                 'xDesc',
-                $this->std->infpedreg->e101101->xdesc,
+                $event->xdesc,
                 true
             );
             $this->dom->addChild(
                 $e101101_inner,
                 'cMotivo',
-                $this->std->infpedreg->e101101->cmotivo,
+                $event->cmotivo,
                 true
             );
             $this->dom->addChild(
                 $e101101_inner,
                 'xMotivo',
-                $this->std->infpedreg->e101101->xmotivo,
+                $event->xmotivo,
                 true
             );
+        } elseif (isset($inf->e105102)) {
+            $event = $inf->e105102;
+            foreach (['xdesc', 'cmotivo', 'chsubstituta'] as $field) {
+                if (!isset($event->{$field}) || trim((string) $event->{$field}) === '') {
+                    throw new \InvalidArgumentException("e105102.{$field} é obrigatório.");
+                }
+            }
+            if ((string) $event->xdesc !== 'Cancelamento de NFS-e por Substituição') {
+                throw new \InvalidArgumentException('e105102.xDesc possui valor inválido.');
+            }
+            if (!preg_match('/^[0-9]{50}$/', (string) $event->chsubstituta)) {
+                throw new \InvalidArgumentException('e105102.chSubstituta deve conter exatamente 50 dígitos.');
+            }
+            $e105102_inner = $this->dom->createElement('e105102');
+            $infpedreg_inner->appendChild($e105102_inner);
+            $this->dom->addChild($e105102_inner, 'xDesc', $event->xdesc, true);
+            $this->dom->addChild($e105102_inner, 'cMotivo', $event->cmotivo, true);
+            if (isset($event->xmotivo)) {
+                $this->dom->addChild($e105102_inner, 'xMotivo', $event->xmotivo, true);
+            }
+            $this->dom->addChild($e105102_inner, 'chSubstituta', $event->chsubstituta, true);
         }
 
         $dps = $this->dom->createElement('DPS');

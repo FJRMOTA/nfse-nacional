@@ -118,6 +118,48 @@ $test('exigSusp gera grupo na ordem oficial', function () use ($dpsBase, $xpathF
     $assert($xp->evaluate('string(//n:exigSusp/n:nProcesso)') === str_repeat('1', 30));
 });
 
+$test('cTribNac preserva zeros e rejeita formato inválido', function () use ($dpsBase, $xpathFor, $assert): void {
+    $std = $dpsBase();
+    $std->infDPS->serv->cServ->cTribNac = '010101';
+    $assert($xpathFor($std)->evaluate('string(//n:cTribNac)') === '010101');
+    foreach (['10101', '0101010', '01A101'] as $invalid) {
+        $std->infDPS->serv->cServ->cTribNac = $invalid;
+        try { (new Dps($std))->render(); }
+        catch (InvalidArgumentException $error) { continue; }
+        throw new RuntimeException("cTribNac inválido aceito: {$invalid}");
+    }
+});
+
+$test('subst não cria xMotivo ausente', function () use ($dpsBase, $xpathFor, $assert): void {
+    $std = $dpsBase();
+    $std->infDPS->subst = (object) [
+        'chSubstda' => str_repeat('1', 50),
+        'cMotivo' => '99',
+    ];
+    $assert($xpathFor($std)->query('//n:subst/n:xMotivo')->length === 0);
+});
+
+$test('eventos exigem dados obrigatórios e geram e105102', function () use ($dpsBase, $assert): void {
+    $event = (object) [
+        'version' => '1.01',
+        'infPedReg' => [
+            'tpAmb' => '2', 'verAplic' => 'TESTE_1.0',
+            'dhEvento' => '2026-09-12T10:00:00-03:00',
+            'CNPJAutor' => '12345678000199', 'chNFSe' => str_repeat('1', 50),
+            'e105102' => [
+                'xDesc' => 'Cancelamento de NFS-e por Substituição',
+                'cMotivo' => '99', 'chSubstituta' => str_repeat('2', 50),
+            ],
+        ],
+    ];
+    $xml = (new Dps($event))->renderEvento();
+    $dom = new DOMDocument();
+    $assert($dom->loadXML($xml, LIBXML_NONET));
+    $assert($dom->getElementsByTagName('e105102')->length === 1);
+    $assert($dom->getElementsByTagName('chSubstituta')->length === 1);
+    $assert(strlen($dom->documentElement->firstChild->getAttribute('Id')) === 59);
+});
+
 $test('exigSusp rejeita campos obrigatórios ausentes ou inválidos', function () use ($dpsBase, $xpathFor): void {
     foreach ([
         (object) ['tpSusp' => '1'],
