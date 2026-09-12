@@ -9,6 +9,8 @@ namespace Hadder\NfseNacional;
 
 use DOMException;
 use DOMNode;
+use Hadder\NfseNacional\Dps\IbsCbsLayout;
+use Hadder\NfseNacional\Dps\IbsCbsSerializer;
 use NFePHP\Common\DOMImproved as Dom;
 use stdClass;
 
@@ -37,14 +39,17 @@ class Dps implements DpsInterface
     protected $dom;
     private string $dpsId;
     private string $preId;
+    private string $layoutProfile;
 
     /**
      * Constructor
      * @param stdClass|null $std
      * @throws DOMException
      */
-    public function __construct(?stdClass $std = null)
+    public function __construct(?stdClass $std = null, string $layoutProfile = IbsCbsLayout::CURRENT)
     {
+        IbsCbsLayout::assertSupported($layoutProfile);
+        $this->layoutProfile = $layoutProfile;
         $this->init($std);
         $this->dom = new Dom('1.0', 'UTF-8');
         $this->dom->preserveWhiteSpace = false;
@@ -143,6 +148,9 @@ class Dps implements DpsInterface
             $this->std->infdps->clocemi,
             true
         );
+
+        $ibsCbsSerializer = new IbsCbsSerializer($this->dom, $this->layoutProfile);
+        $ibsCbsSerializer->renderHeader($infdps_inner, $this->std->infdps);
 
         if (isset($this->std->infdps->subst)) {
             $subst_inner = $this->dom->createElement('subst');
@@ -880,6 +888,8 @@ class Dps implements DpsInterface
 			$this->dom->addChild($descontos_inner, 'vDescCond',   $vDescCond,   false);
 		}
 
+        $ibsCbsSerializer->renderValueAdjustment($valores_inner, $this->std->infdps);
+
 
         //TODO Fazer grupo vDedRed
 
@@ -1344,6 +1354,8 @@ class Dps implements DpsInterface
 //
 //        }
 
+        $ibsCbsSerializer->render($infdps_inner, $this->std->infdps);
+
         $dps = $this->dom->createElement('DPS');
         $dps->setAttribute('versao', $this->std->version);
         $dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
@@ -1452,6 +1464,18 @@ class Dps implements DpsInterface
         $this->init($std);
     }
 
+    public function setLayoutProfile(string $layoutProfile): self
+    {
+        IbsCbsLayout::assertSupported($layoutProfile);
+        $this->layoutProfile = $layoutProfile;
+        return $this;
+    }
+
+    public function getLayoutProfile(): string
+    {
+        return $this->layoutProfile;
+    }
+
     /**
      * Mudar todas proprioedades da stdClass para minúsculas
      * @param stdClass $data
@@ -1464,6 +1488,10 @@ class Dps implements DpsInterface
         foreach ($properties as $key => $value) {
             if ($value instanceof stdClass) {
                 $value = self::propertiesToLower($value);
+            } elseif (is_array($value)) {
+                $value = array_map(static function ($item) {
+                    return $item instanceof stdClass ? self::propertiesToLower($item) : $item;
+                }, $value);
             }
             $newkey = strtolower($key);
             $clone->{$newkey} = $value;
