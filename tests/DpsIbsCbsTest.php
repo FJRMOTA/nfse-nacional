@@ -142,11 +142,11 @@ $test('subst não cria xMotivo ausente', function () use ($dpsBase, $xpathFor, $
 $test('eventos exigem dados obrigatórios e geram e105102', function () use ($dpsBase, $assert): void {
     $event = (object) [
         'version' => '1.01',
-        'infPedReg' => [
+        'infPedReg' => (object) [
             'tpAmb' => '2', 'verAplic' => 'TESTE_1.0',
             'dhEvento' => '2026-09-12T10:00:00-03:00',
             'CNPJAutor' => '12345678000199', 'chNFSe' => str_repeat('1', 50),
-            'e105102' => [
+            'e105102' => (object) [
                 'xDesc' => 'Cancelamento de NFS-e por Substituição',
                 'cMotivo' => '99', 'chSubstituta' => str_repeat('2', 50),
             ],
