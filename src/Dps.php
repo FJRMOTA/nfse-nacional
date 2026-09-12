@@ -906,6 +906,27 @@ class Dps implements DpsInterface
             true
         );
 
+        $tribMun = $this->std->infdps->valores->trib->tribmun;
+        if (isset($tribMun->exigsusp)) {
+            if ((string) ($tribMun->tribissqn ?? '') !== '1') {
+                throw new \InvalidArgumentException('exigSusp somente pode ser informado quando tribISSQN=1.');
+            }
+            $suspension = $tribMun->exigsusp;
+            if (!is_object($suspension) || !isset($suspension->tpsusp, $suspension->nprocesso)) {
+                throw new \InvalidArgumentException('exigSusp exige tpSusp e nProcesso.');
+            }
+            if (!in_array((string) $suspension->tpsusp, ['1', '2'], true)) {
+                throw new \InvalidArgumentException('exigSusp/tpSusp deve ser 1 (judicial) ou 2 (administrativo).');
+            }
+            if (!preg_match('/^[0-9]{30}$/', (string) $suspension->nprocesso)) {
+                throw new \InvalidArgumentException('exigSusp/nProcesso deve conter exatamente 30 dígitos.');
+            }
+            $exigSusp_inner = $this->dom->createElement('exigSusp');
+            $tribmun_inner->appendChild($exigSusp_inner);
+            $this->dom->addChild($exigSusp_inner, 'tpSusp', $suspension->tpsusp, true);
+            $this->dom->addChild($exigSusp_inner, 'nProcesso', $suspension->nprocesso, true);
+        }
+
         if (isset($this->std->infdps->valores->trib->tribmun->tribissqn) && $this->std->infdps->valores->trib->tribmun->tribissqn == 
                 2 && isset($this->std->infdps->valores->trib->tribmun->tpimunidade)) {
             $this->dom->addChild(

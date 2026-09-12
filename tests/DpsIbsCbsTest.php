@@ -102,6 +102,46 @@ $test('DPS preserva CNPJ alfanumérico no XML', function () use ($dpsBase, $xpat
     $assert($xp->evaluate('string(//n:prest/n:CNPJ)') === '12ABC34501DE99');
 });
 
+$test('exigSusp gera grupo na ordem oficial', function () use ($dpsBase, $xpathFor, $assert): void {
+    $std = $dpsBase();
+    $std->infDPS->valores->trib->tribMun->exigSusp = (object) [
+        'tpSusp' => '1',
+        'nProcesso' => str_repeat('1', 30),
+    ];
+    $xp = $xpathFor($std);
+    $nodes = [];
+    foreach ($xp->query('//n:tribMun/*') as $node) {
+        $nodes[] = $node->localName;
+    }
+    $assert($nodes === ['tribISSQN', 'exigSusp', 'tpRetISSQN']);
+    $assert($xp->evaluate('string(//n:exigSusp/n:tpSusp)') === '1');
+    $assert($xp->evaluate('string(//n:exigSusp/n:nProcesso)') === str_repeat('1', 30));
+});
+
+$test('exigSusp rejeita campos obrigatórios ausentes ou inválidos', function () use ($dpsBase, $xpathFor): void {
+    foreach ([
+        (object) ['tpSusp' => '1'],
+        (object) ['nProcesso' => str_repeat('1', 30)],
+        (object) ['tpSusp' => '3', 'nProcesso' => str_repeat('1', 30)],
+        (object) ['tpSusp' => '1', 'nProcesso' => '123'],
+    ] as $suspension) {
+        $std = $dpsBase();
+        $std->infDPS->valores->trib->tribMun->exigSusp = $suspension;
+        try { $xpathFor($std); } catch (InvalidArgumentException) { continue; }
+        throw new RuntimeException('exigSusp inválido foi aceito');
+    }
+});
+
+$test('exigSusp rejeitado quando ISSQN não é tributável', function () use ($dpsBase, $xpathFor): void {
+    $std = $dpsBase();
+    $std->infDPS->valores->trib->tribMun->tribISSQN = '2';
+    $std->infDPS->valores->trib->tribMun->exigSusp = (object) [
+        'tpSusp' => '1', 'nProcesso' => str_repeat('1', 30),
+    ];
+    try { $xpathFor($std); } catch (InvalidArgumentException) { return; }
+    throw new RuntimeException('exigSusp incompatível foi aceito');
+});
+
 $test('destinatário respeita choice, endereço e ordem', function () use ($dpsBase, $currentIbs, $xpathFor, $assert): void {
     $std = $dpsBase(); $std->infDPS->IBSCBS = $currentIbs();
     $std->infDPS->IBSCBS->indDest = '1';
