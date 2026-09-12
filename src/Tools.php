@@ -23,7 +23,19 @@ class Tools extends RestCurl
         if ($retorno) {
             $base_decode = base64_decode($retorno['nfseXmlGZipB64']);
             $gz_decode = gzdecode($base_decode);
-            return $encoding ? mb_convert_encoding($gz_decode, 'ISO-8859-1') : $gz_decode;
+            if ($gz_decode === false) {
+                throw new \RuntimeException('Não foi possível descompactar o XML da NFS-e.');
+            }
+            if (!$encoding) {
+                return $gz_decode;
+            }
+            // ADN returns the XML as ISO-8859-1 in this endpoint. Keep UTF-8
+            // output for DOM/XML consumers and avoid converting an already UTF-8 document.
+            if (preg_match('/encoding=["\']UTF-8["\']/i', substr($gz_decode, 0, 200))
+                || mb_detect_encoding($gz_decode, ['UTF-8'], true) === 'UTF-8') {
+                return $gz_decode;
+            }
+            return mb_convert_encoding($gz_decode, 'UTF-8', 'ISO-8859-1');
         }
 
         return null;
@@ -39,17 +51,19 @@ class Tools extends RestCurl
     {
         $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_eventos'));
 
-        if (!$tipoEvento) {
-            $operacao = str_replace("/{tipoEvento}/{nSequencial}", "", $operacao);
+        if ($nSequencial !== null && $nSequencial !== '' && ($tipoEvento === null || $tipoEvento === '')) {
+            throw new \InvalidArgumentException('nSequencial requer tipoEvento.');
         }
-
-        $operacao = str_replace("{tipoEvento}", $tipoEvento, $operacao);
-
-        if (!$nSequencial) {
-            $operacao = str_replace("/{nSequencial}", "", $operacao);
+        if ($tipoEvento === null || $tipoEvento === '') {
+            $operacao = str_replace('/{tipoEvento}/{nSequencial}', '', $operacao);
+        } else {
+            $operacao = str_replace('{tipoEvento}', rawurlencode((string) $tipoEvento), $operacao);
+            if ($nSequencial === null || $nSequencial === '') {
+                $operacao = str_replace('/{nSequencial}', '', $operacao);
+            } else {
+                $operacao = str_replace('{nSequencial}', rawurlencode((string) $nSequencial), $operacao);
+            }
         }
-
-        $operacao = str_replace("{nSequencial}", $nSequencial, $operacao);
 
         return $this->getData($operacao);
     }
