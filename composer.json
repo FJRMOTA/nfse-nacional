@@ -35,6 +35,13 @@
   "config": {
     "optimize-autoloader": true
   },
+  "suggest": {
+    "ext-gd": "Necessária para renderizar o logo PNG do DANFSe (alternativamente ext-imagick).",
+    "ext-imagick": "Alternativa ao GD para renderizar o logo PNG do DANFSe."
+  },
+  "scripts": {
+    "test": "php tests/run.php"
+  },
   "prefer-stable": true,
   "require-dev": {
     "symfony/var-dumper": "^6.4 || ^7.0"
