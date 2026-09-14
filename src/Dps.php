@@ -944,12 +944,15 @@ class Dps implements DpsInterface
             );
         }
 
-        if(isset($this->std->infdps->valores->trib->tribmun->tribissqn) && $this->std->infdps->valores->trib->tribmun->tribissqn == 3){
+        if (
+            isset($tribMun->tribissqn)
+            && (string) $tribMun->tribissqn === '3'
+            && isset($tribMun->cpaisresult)
+        ) {
             $this->dom->addChild(
                 $tribmun_inner,
                 'cPaisResult',
-                $this->std->infdps->valores->trib->tribmun->cpaisresult,
-                true
+                $tribMun->cpaisresult
             );
         }
 

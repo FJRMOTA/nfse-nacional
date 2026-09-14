@@ -130,6 +130,81 @@ $test('cTribNac preserva zeros e rejeita formato inválido', function () use ($d
     }
 });
 
+$test('cPaisResult só é serializado quando presente em tribISSQN=3', function () use ($dpsBase, $xpathFor, $assert): void {
+    foreach ([1, 2, 3, 4] as $tribISSQN) {
+        foreach ([false, true] as $withCountry) {
+            $std = $dpsBase();
+            $std->infDPS->valores->trib->tribMun->tribISSQN = $tribISSQN;
+            if ($withCountry) {
+                $std->infDPS->valores->trib->tribMun->cPaisResult = 'US';
+            }
+
+            $warnings = [];
+            set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+                $warnings[] = $message;
+                return true;
+            });
+            try {
+                $xp = $xpathFor($std);
+            } finally {
+                restore_error_handler();
+            }
+
+            $expected = $tribISSQN === 3 && $withCountry ? 1 : 0;
+            $assert(
+                $xp->query('//n:tribMun/n:cPaisResult')->length === $expected,
+                "cPaisResult inesperado para tribISSQN={$tribISSQN}, presente=" . ($withCountry ? 'sim' : 'não')
+            );
+            if ($expected === 1) {
+                $assert($xp->evaluate('string(//n:tribMun/n:cPaisResult)') === 'US');
+            }
+            $assert($warnings === [], 'serialização emitiu warning: ' . implode(' | ', $warnings));
+        }
+    }
+});
+
+$test('cPaisResult nulo ou vazio é omitido sem warning', function () use ($dpsBase, $xpathFor, $assert): void {
+    foreach ([null, ''] as $country) {
+        $std = $dpsBase();
+        $std->infDPS->valores->trib->tribMun->tribISSQN = 3;
+        $std->infDPS->valores->trib->tribMun->cPaisResult = $country;
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+            return true;
+        });
+        try {
+            $xp = $xpathFor($std);
+        } finally {
+            restore_error_handler();
+        }
+        $assert($xp->query('//n:tribMun/n:cPaisResult')->length === 0);
+        $assert($warnings === [], 'serialização emitiu warning: ' . implode(' | ', $warnings));
+    }
+});
+
+$test('cPaisResult ausente não adiciona erro XSD próprio', function () use ($dpsBase, $assert): void {
+    $std = $dpsBase();
+    $std->infDPS->valores->trib->tribMun->tribISSQN = 3;
+    $dom = new DOMDocument();
+    $dom->loadXML((new Dps($std))->render(), LIBXML_NONET);
+    $previous = libxml_use_internal_errors(true);
+    $valid = $dom->schemaValidate(__DIR__ . '/../storage/schemes/DPS_v1.01.xsd');
+    $errors = libxml_get_errors();
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
+    $messages = array_map(static fn (LibXMLError $error): string => $error->message, $errors);
+    $assert(!$valid, 'o fixture deve continuar bloqueado pelo defeito TSSerieDPS');
+    $assert(
+        !array_filter($messages, static fn (string $message): bool => str_contains($message, 'cPaisResult')),
+        'cPaisResult ainda gera erro XSD: ' . implode(' | ', $messages)
+    );
+    $assert(
+        count(array_filter($messages, static fn (string $message): bool => str_contains($message, 'serie') && str_contains($message, '^0{0,4}\\d{1,5}$'))) === 1,
+        'erro TSSerieDPS não identificado isoladamente: ' . implode(' | ', $messages)
+    );
+});
+
 $test('subst não cria xMotivo ausente', function () use ($dpsBase, $xpathFor, $assert): void {
     $std = $dpsBase();
     $std->infDPS->subst = (object) [
