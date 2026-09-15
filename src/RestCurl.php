@@ -8,6 +8,7 @@ use NFePHP\Common\Certificate;
 use NFePHP\Common\Exception\SoapException;
 use NFePHP\Common\Signer;
 use RuntimeException;
+use Hadder\NfseNacional\Common\HttpResponse;
 
 class RestCurl extends RestBase
 {
@@ -93,69 +94,19 @@ class RestCurl extends RestBase
      */
     public function getData($operacao, $data = null, $origem = 1)
     {
-        $this->resolveUrl($origem);
-        $this->saveTemporarilyKeyFiles();
-        try {
-            $msgSize = $data ? strlen($data) : 0;
-            $parameters = [
-                "Content-Type: application/json;charset=utf-8;",
-                "Content-length: $msgSize"
-            ];
-            $oCurl = curl_init();
-            $api_url = $this->url_api;
-            if (strlen($operacao) > 0) {
-                $api_url .= '/' . $operacao;
-            }
-            curl_setopt($oCurl, CURLOPT_URL, $api_url);
-            curl_setopt($oCurl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-            curl_setopt($oCurl, CURLOPT_CONNECTTIMEOUT, $this->connection_timeout);
-            curl_setopt($oCurl, CURLOPT_TIMEOUT, $this->timeout);
-            curl_setopt($oCurl, CURLOPT_HEADER, 1);
-            curl_setopt($oCurl, CURLOPT_HTTP_VERSION, $this->httpver);
-            curl_setopt($oCurl, CURLOPT_SSL_VERIFYHOST, 0);
-            curl_setopt($oCurl, CURLOPT_SSL_VERIFYPEER, 0);
-            if (!empty($this->security_level)) {
-                curl_setopt($oCurl, CURLOPT_SSL_CIPHER_LIST, "{$this->security_level}");
-            }
-            curl_setopt($oCurl, CURLOPT_SSLVERSION, CURL_SSLVERSION_DEFAULT);
-            curl_setopt($oCurl, CURLOPT_SSLCERT, $this->tempdir . $this->certfile);
-            curl_setopt($oCurl, CURLOPT_SSLKEY, $this->tempdir . $this->prifile);
-            if (!empty($this->temppass)) {
-                curl_setopt($oCurl, CURLOPT_KEYPASSWD, $this->temppass);
-            }
-            curl_setopt($oCurl, CURLOPT_RETURNTRANSFER, 1);
-            if (!empty($data)) {
-                curl_setopt($oCurl, CURLOPT_POST, 1);
-                curl_setopt($oCurl, CURLOPT_POSTFIELDS, $data);
-                curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
-            } elseif ($origem === 3 && !empty($this->cookies)) {
-                $parameters[] = 'Cookie: ' . $this->cookies;
-                curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
-            }
-            $response = curl_exec($oCurl);
-            $this->soaperror = curl_error($oCurl);
-            $this->soaperror_code = curl_errno($oCurl);
-            $ainfo = curl_getinfo($oCurl);
-            if (is_array($ainfo)) {
-                $this->soapinfo = $ainfo;
-            }
-            $headsize = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
-            $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
-            $contentType = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
-            $this->responseHead = trim(substr($response, 0, $headsize));
-            $this->responseBody = trim(substr($response, $headsize));
-            if ($origem == 3 and $httpcode == 302) {
-                $this->captureCookies($this->responseHead, $origem);
-                return ['sucesso' => true];
-            }
-            if ($contentType == 'application/pdf') {
-                return $this->responseBody;
-            } else {
-                return json_decode($this->responseBody, true);
-            }
-        } catch (Exception $e) {
-            throw SoapException::unableToLoadCurl($e->getMessage());
+        // Mantém a semântica histórica: GET com payload era enviado como POST.
+        $response = $this->requestDetailed($data ? 'POST' : 'GET', $operacao, $data, $origem);
+        if ($origem == 3 && $response->status === 302) {
+            $this->captureCookies($this->responseHead, $origem);
+            return ['sucesso' => true];
         }
+        $contentType = $this->soapinfo['content_type'] ?? '';
+        return $contentType === 'application/pdf' ? $this->responseBody : $response->json;
+    }
+
+    public function getDataDetailed($operacao, $data = null, $origem = 1): HttpResponse
+    {
+        return $this->requestDetailed('GET', $operacao, $data, $origem);
     }
 
     /**
@@ -166,60 +117,53 @@ class RestCurl extends RestBase
      */
     public function postData($operacao, $data, $origem = 1)
     {
+        return $this->postDataDetailed($operacao, $data, $origem)->json;
+    }
+
+    public function postDataDetailed($operacao, $data, $origem = 1): HttpResponse
+    {
+        return $this->requestDetailed('POST', $operacao, $data, $origem);
+    }
+
+    private function requestDetailed(string $method, $operacao, $data, $origem): HttpResponse
+    {
         $this->resolveUrl($origem);
         $this->saveTemporarilyKeyFiles();
         try {
-            $msgSize = $data ? strlen($data) : 0;
-            $parameters = [
-                'Content-Type: application/json',
-                'Content-length: ' . $msgSize,
-            ];
-            $oCurl = curl_init();
-            $api_url = $this->url_api;
-            if (strlen($operacao) > 0) {
-                $api_url .= '/' . $operacao;
+            $parameters = $method === 'POST'
+                ? ['Content-Type: application/json', 'Content-length: ' . ($data ? strlen($data) : 0)]
+                : ['Content-Type: application/json;charset=utf-8;', 'Content-length: ' . ($data ? strlen($data) : 0)];
+            $curl = curl_init();
+            $url = $this->url_api . (strlen($operacao) > 0 ? '/' . $operacao : '');
+            curl_setopt_array($curl, [
+                CURLOPT_URL => $url, CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                CURLOPT_CONNECTTIMEOUT => $this->connection_timeout, CURLOPT_TIMEOUT => $this->timeout,
+                CURLOPT_HEADER => 1, CURLOPT_HTTP_VERSION => $this->httpver,
+                CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_SSL_VERIFYPEER => 0,
+                CURLOPT_SSLVERSION => CURL_SSLVERSION_DEFAULT,
+                CURLOPT_SSLCERT => $this->tempdir . $this->certfile,
+                CURLOPT_SSLKEY => $this->tempdir . $this->prifile,
+                CURLOPT_KEYPASSWD => $this->temppass ?? '', CURLOPT_RETURNTRANSFER => 1,
+            ]);
+            if ($method === 'POST') {
+                curl_setopt($curl, CURLOPT_POST, 1);
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+                curl_setopt($curl, CURLOPT_HTTPHEADER, $parameters);
+            } elseif ($origem === 3 && !empty($this->cookies)) {
+                $parameters[] = 'Cookie: ' . $this->cookies;
+                curl_setopt($curl, CURLOPT_HTTPHEADER, $parameters);
             }
-            curl_setopt($oCurl, CURLOPT_URL, $api_url);
-            curl_setopt($oCurl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-            curl_setopt($oCurl, CURLOPT_CONNECTTIMEOUT, $this->connection_timeout);
-            curl_setopt($oCurl, CURLOPT_TIMEOUT, $this->timeout);
-            curl_setopt($oCurl, CURLOPT_HEADER, 1);
-            curl_setopt($oCurl, CURLOPT_HTTP_VERSION, $this->httpver);
-            curl_setopt($oCurl, CURLOPT_SSL_VERIFYHOST, 0);
-            curl_setopt($oCurl, CURLOPT_SSL_VERIFYPEER, 0);
-            if (!empty($this->security_level)) {
-                curl_setopt($oCurl, CURLOPT_SSL_CIPHER_LIST, "{$this->security_level}");
-            }
-
-            curl_setopt($oCurl, CURLOPT_SSLVERSION, CURL_SSLVERSION_DEFAULT);
-            curl_setopt($oCurl, CURLOPT_SSLCERT, $this->tempdir . $this->certfile);
-            curl_setopt($oCurl, CURLOPT_SSLKEY, $this->tempdir . $this->prifile);
-            if (!empty($this->temppass)) {
-                curl_setopt($oCurl, CURLOPT_KEYPASSWD, $this->temppass);
-            }
-            curl_setopt($oCurl, CURLOPT_RETURNTRANSFER, 1);
-            if (!empty($data)) {
-                curl_setopt($oCurl, CURLOPT_POST, 1);
-                curl_setopt($oCurl, CURLOPT_POSTFIELDS, $data);
-                //curl_setopt($oCurl, CURLOPT_POSTFIELDS, http_build_query($data)); // Dados para enviar no POST
-                curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
-            }
-            $response = curl_exec($oCurl);
-
-            $this->soaperror = curl_error($oCurl);
-            $this->soaperror_code = curl_errno($oCurl);
-            $ainfo = curl_getinfo($oCurl);
-            if (is_array($ainfo)) {
-                $this->soapinfo = $ainfo;
-            }
-            $headsize = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
-            $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
-            $this->responseHead = trim(substr($response, 0, $headsize));
-            $this->responseBody = trim(substr($response, $headsize));
-            return json_decode($this->responseBody, true);
-        } catch (Exception $e) {
-            throw SoapException::unableToLoadCurl($e->getMessage());
-        }
+            $response = curl_exec($curl);
+            $error = curl_error($curl); $errno = curl_errno($curl); $info = curl_getinfo($curl);
+            $raw = is_string($response) ? $response : '';
+            $headSize = (int) ($info['header_size'] ?? 0);
+            $headers = substr($raw, 0, $headSize);
+            $body = substr($raw, $headSize);
+            $this->soaperror = $error; $this->soaperror_code = $errno; $this->soapinfo = $info;
+            $this->responseHead = trim($headers); $this->responseBody = trim($body);
+            $json = json_decode($body, true); $jsonValid = json_last_error() === JSON_ERROR_NONE;
+            return new HttpResponse((int) ($info['http_code'] ?? 0), $headers, $body, $json, $jsonValid, $errno, $error);
+        } catch (Exception $e) { throw SoapException::unableToLoadCurl($e->getMessage()); }
     }
 
     public function setTimeout($timeout)

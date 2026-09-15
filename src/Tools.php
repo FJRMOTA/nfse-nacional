@@ -3,6 +3,7 @@
 namespace Hadder\NfseNacional;
 
 use NFePHP\Common\Certificate;
+use Hadder\NfseNacional\Common\HttpResponse;
 
 class Tools extends RestCurl
 {
@@ -130,6 +131,23 @@ class Tools extends RestCurl
         $operacao = $this->getOperation('emitir_nfse');
 
         return $this->postData($operacao, json_encode($dados));
+    }
+
+    /** Envia bytes de uma DPS já assinada, sem tocar no conteúdo recebido. */
+    public function enviaDpsAssinado(string $signedXml): HttpResponse
+    {
+        $dados = ['dpsXmlGZipB64' => base64_encode(gzencode($signedXml))];
+        return $this->postDataDetailed($this->getOperation('emitir_nfse'), json_encode($dados, JSON_THROW_ON_ERROR));
+    }
+
+    public function consultarDpsChaveDetalhada($chave): HttpResponse
+    {
+        return $this->getDataDetailed(str_replace('{chave}', $chave, $this->getOperation('consultar_dps')));
+    }
+
+    public function consultarNfseChaveDetalhada($chave): HttpResponse
+    {
+        return $this->getDataDetailed(str_replace('{chave}', $chave, $this->getOperation('consultar_nfse')));
     }
 
     public function cancelaNfse($std)
