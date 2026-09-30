@@ -35,6 +35,7 @@ if ($fixture === false) { throw new RuntimeException('Fixture ausente.'); }
 if (class_exists('NFePHP\\Common\\DOMImproved')) {
     require __DIR__ . '/TransportTest.php';
     require __DIR__ . '/DpsIbsCbsTest.php';
+    require __DIR__ . '/DpsValidationTest.php';
     if (is_file(__DIR__ . '/CnpjSchemaTest.php')) {
         require __DIR__ . '/CnpjSchemaTest.php';
     }

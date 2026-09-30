@@ -79,6 +79,7 @@ class Dps implements DpsInterface
         }
 
         $this->init($std);
+        $this->assertRequiredGroups();
         $this->dps = $this->dom->createElement('DPS');
         $this->dps->setAttribute('versao', $this->std->version);
         $this->dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
@@ -1553,6 +1554,80 @@ class Dps implements DpsInterface
     public function getLayoutProfile(): string
     {
         return $this->layoutProfile;
+    }
+
+    /**
+     * Grupos obrigatórios do leiaute que o render acessa diretamente
+     * @return void
+     */
+    private function assertRequiredGroups(): void
+    {
+        $groups = ['prest', 'prest.regTrib', 'serv', 'serv.locPrest', 'serv.cServ', 'valores', 'valores.vServPrest', 'valores.trib', 'valores.trib.tribMun'];
+        foreach ($groups as $path) {
+            $node = $this->std->infdps ?? null;
+            foreach (explode('.', strtolower($path)) as $name) {
+                $node = is_object($node) ? ($node->{$name} ?? null) : null;
+            }
+            if (!is_object($node)) {
+                throw new \InvalidArgumentException("Campo obrigatório ausente: infDPS.{$path}.");
+            }
+        }
+    }
+
+    /**
+     * Erros de preenchimento acumulados pelo DOM durante o último render()
+     * @return array<int, string>
+     */
+    public function getErrors(): array
+    {
+        return $this->dom->errors;
+    }
+
+    /**
+     * Valida o XML da DPS contra o XSD oficial do perfil de leiaute
+     * @param string $xml
+     * @return array<int, string> erros encontrados; vazio quando o XML é válido
+     */
+    public function validate(string $xml): array
+    {
+        $schema = IbsCbsLayout::SCHEMAS[$this->layoutProfile] ?? null;
+        if ($schema === null) {
+            throw new \RuntimeException(sprintf('O perfil %s não possui XSD oficial publicado.', $this->layoutProfile));
+        }
+        $previous = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        try {
+            $dom = new \DOMDocument('1.0', 'UTF-8');
+            if (!$dom->loadXML($xml, LIBXML_NONET)) {
+                $errors = array_map(static fn (\LibXMLError $error): string => trim($error->message), libxml_get_errors());
+                return $errors !== [] ? $errors : ['XML da DPS inválido.'];
+            }
+            $dom->schemaValidate(__DIR__ . '/../storage/schemes/' . $schema);
+            $errors = [];
+            foreach (libxml_get_errors() as $error) {
+                $message = trim($error->message);
+                if (!self::isKnownSerieSchemaIssue($message)) {
+                    $errors[] = $message;
+                }
+            }
+            return $errors;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
+     * O pattern oficial de TSSerieDPS usa ^ e $, que em XML Schema são literais;
+     * somente uma série que atende ao pattern pretendido é tolerada.
+     * @param string $message
+     * @return bool
+     */
+    private static function isKnownSerieSchemaIssue(string $message): bool
+    {
+        $pattern = '/^Element \'\{http:\/\/www\.sped\.fazenda\.gov\.br\/nfse\}serie\': \[facet \'pattern\'\] '
+            . 'The value \'([^\']*)\' is not accepted by the pattern \'' . preg_quote('^0{0,4}\d{1,5}$', '/') . '\'\.$/D';
+        return preg_match($pattern, $message, $matches) === 1 && preg_match('/^0{0,4}\d{1,5}$/D', $matches[1]) === 1;
     }
 
     /**

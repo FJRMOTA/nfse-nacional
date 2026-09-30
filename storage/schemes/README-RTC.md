@@ -25,6 +25,16 @@ Embora os filenames permaneçam `v1.01`, este pacote não é o snapshot de
 `tpRetPisCofins`, campos opcionais adicionais e regras de identificadores.
 O tipo `TSCNPJ` do pacote de Produção, entretanto, ainda é `[0-9]{14}`.
 
+### Validação em runtime
+
+`Dps::validate($xml)` valida a DPS contra o XSD do perfil (`IbsCbsLayout::SCHEMAS`)
+sem alterar o arquivo oficial. O `TSSerieDPS` oficial declara o pattern
+`^0{0,4}\d{1,5}$`; em XML Schema `^` e `$` são caracteres literais, então nenhuma
+série numérica é aceita pelo libxml. Somente esse erro é descartado, e apenas
+quando o valor da série atende ao pattern pretendido (`^0{0,4}\d{1,5}$` com
+âncoras). Qualquer outro erro, inclusive o `maxLength` da série, é devolvido.
+`Dps::getErrors()` expõe os campos obrigatórios vazios acumulados no render.
+
 ## Produção Restrita / homologação — CNPJ alfanumérico
 
 O comunicado oficial de 28/07/2026 informa a disponibilização em 27/07/2026
