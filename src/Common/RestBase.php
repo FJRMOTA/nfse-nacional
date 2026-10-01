@@ -26,6 +26,15 @@ class RestBase
     }
 
     /**
+     * Destructor
+     * Clean temporary files
+     */
+    public function __destruct()
+    {
+        $this->removeTemporarilyFiles();
+    }
+
+    /**
      * Setao certificado pra comunicação SSL
      * @param Certificate $certificate
      * @return void
@@ -117,6 +126,15 @@ class RestBase
         $this->prifile = $this->randomName();
         $this->pubfile = $this->randomName();
         $this->certfile = $this->randomName();
+        foreach ([$this->prifile, $this->pubfile, $this->certfile] as $file) {
+            $path = $this->tempdir . $file;
+            $dir = dirname($path);
+            if ((!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) || !touch($path) || !chmod($path, 0600)) {
+                throw new RuntimeException(
+                    'Unable to create temporary key files with restricted permissions.'
+                );
+            }
+        }
         $ret = true;
         //load private key pem
         $private = $this->certificate->privateKey;

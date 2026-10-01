@@ -4,6 +4,7 @@ use Hadder\NfseNacional\Common\HttpResponse;
 use Hadder\NfseNacional\Tools;
 
 require_once __DIR__ . '/../src/Common/HttpResponse.php';
+require_once __DIR__ . '/../src/Common/RestBase.php';
 require_once __DIR__ . '/../src/RestCurl.php';
 require_once __DIR__ . '/../src/Tools.php';
 
